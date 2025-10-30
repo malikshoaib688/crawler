@@ -1,56 +1,69 @@
 name: Run and Auto-Save Kali VNC Container
+
 on:
   workflow_dispatch:
 
 jobs:
   run-and-save-session:
     runs-on: ubuntu-latest
-    timeout-minutes: 360   # 6 hours max
+    timeout-minutes: 3600 # 6 hours
+
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
+      SSH_PASS: ${{ secrets.SSH_PASS }}
 
     steps:
       - name: Login to Docker Hub
         run: |
-          echo "${{ secrets.DOCKERHUB_PASSWORD }}" | \
-            docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+          echo "Logging in to Docker Hub..."
+          echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
 
       - name: Pull and Run Container
         run: |
-          IMAGE_NAME="${{ secrets.DOCKERHUB_USERNAME }}/kali_linux:autov1"
+          IMAGE_NAME="$DOCKERHUB_USERNAME/kali_linux:autov1"
           echo "Pulling latest image: $IMAGE_NAME"
           docker pull "$IMAGE_NAME"
-          echo "Starting container..."
-          docker run -d --name kali-session \
+
+          echo "Starting container with full privileges..."
+          docker run -d --name=kali-session \
             --privileged \
-            -e SSH_PASS="${{ secrets.SSH_PASSWORD }}" \
-            -v ~/shared_storage:/root/shared \
+            --volume ~/shared_storage:/root/shared \
             "$IMAGE_NAME" tail -f /dev/null
 
-      - name: Prepare Container
+      - name: Create Helper and Startup Scripts
         run: docker exec kali-session chmod +x /start.sh
 
       - name: Start Services and Auto-Save Process
         run: |
-          docker exec -d kali-session bash /start.sh
+          echo "Executing '/start.sh' in the container to launch services..."
+          docker exec kali-session bash /start.sh &
+
           (
-            sleep 19800   # 5.5 hours
+            sleep 19800 # 5.5 hours in seconds
             echo "[Auto-Save] Committing container state..."
-            docker commit kali-session "${{ secrets.DOCKERHUB_USERNAME }}/kali_linux:autov1"
-            docker push "${{ secrets.DOCKERHUB_USERNAME }}/kali_linux:autov1"
-            echo "[Auto-Save] Done!"
+            docker commit kali-session "$DOCKERHUB_USERNAME/kali_linux:autov1"
+            echo "[Auto-Save] Pushing new image to Docker Hub..."
+            docker push "$DOCKERHUB_USERNAME/kali_linux:autov1"
+            echo "[Auto-Save] Session state saved!"
           ) &
 
       - name: Display Info
         run: |
-          echo "==============================================================="
-          echo "  SESSION READY"
-          echo "  SSH password stored in container env variable SSH_PASS"
-          echo "==============================================================="
+          echo "=============================================================="
+          echo " SESSION IS READY"
+          echo " SSH password stored in env var SSH_PASS for tmate access"
+          echo "=============================================================="
 
       - name: Start tmate SSH Session
         uses: mxschmitt/action-tmate@v3
+        env:
+          TMATE_SSH_PASS: ${{ secrets.SSH_PASS }}
 
       - name: Keep Workflow Alive
         run: |
+          echo "Keeping workflow alive... (max ~6 hours)"
+          echo "Press Ctrl+C or cancel the workflow to stop."
           while true; do
             echo "[$(date)] Workflow still running..."
             sleep 60
