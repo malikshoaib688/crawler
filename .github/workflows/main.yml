@@ -59,8 +59,8 @@ jobs:
         run: |
           set -e
           # install tmate (Debian/Ubuntu)
-          apt-get update -y
-          apt-get install -y tmate
+          sudo apt-get update -y
+          sudo apt-get install -y tmate
 
           # define socket for this session
           export TMATE_SOCK=/tmp/tmate.sock
