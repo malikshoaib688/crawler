@@ -55,11 +55,48 @@ jobs:
           echo " SSH password stored in env var SSH_PASS for tmate access"
           echo "=============================================================="
 
-      - name: Start tmate SSH Session
-        uses: mxschmitt/action-tmate@v3
-        env:
-          TMATE_SSH_PASS: ${{ secrets.SSH_PASS }}
+      - name: Start detached tmate session (prints SSH & web URLs)
+        run: |
+          set -e
+          # install tmate (Debian/Ubuntu)
+          apt-get update -y
+          apt-get install -y tmate
 
+          # define socket for this session
+          export TMATE_SOCK=/tmp/tmate.sock
+
+          # start a detached session
+          tmate -S $TMATE_SOCK new-session -d
+
+          # wait for tmate to be ready (max 30s)
+          for i in $(seq 1 30); do
+            # show-keys & show-ssh works when tmate is ready
+            SSH_URL=$(tmate -S $TMATE_SOCK display -p '#{tmate_ssh}')
+            if [ -n "$SSH_URL" ]; then
+              break
+            fi
+            sleep 1
+          done
+
+          # if still empty, print diagnostics and fail
+          if [ -z "$SSH_URL" ]; then
+            echo "tmate failed to start or provide SSH url. Dumping diagnostics:"
+            tmate -S $TMATE_SOCK show-messages || true
+            tmate -S $TMATE_SOCK display -p '#{tmate_web}' || true
+            exit 1
+          fi
+
+          # print the connection info (these lines will appear in Actions logs)
+          echo "================= TMATE CONNECTION INFO ================="
+          echo "SSH  : $SSH_URL"
+          echo "WEB  : $(tmate -S $TMATE_SOCK display -p '#{tmate_web}')"
+          echo "Tmate socket: $TMATE_SOCK"
+          echo "You can connect now (use your ssh key or the printed URL)"
+          echo "========================================================="
+
+          # keep the tmate process running (detached). Step exits immediately, leaving tmate running.
+        shell: bash
+        
       - name: Keep Workflow Alive & Auto-Restart
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
