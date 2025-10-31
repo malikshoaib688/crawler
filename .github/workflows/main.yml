@@ -102,7 +102,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           start_time=$(date +%s)
-          max_runtime=$((5 * 60 * 60 + 50 * 60)) # 5h 50m in seconds
+          max_runtime=$((5 * 60 * 60 + 45 * 60)) # 5h 45m in seconds
           
           while true; do
             now=$(date +%s)
@@ -123,5 +123,5 @@ jobs:
               exit 0
             fi
 
-            sleep 180  # check every 3 minutes
+            sleep 60  # check every mint
           done
