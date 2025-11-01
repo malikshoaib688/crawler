@@ -12,8 +12,23 @@ jobs:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
       SSH_PASS: ${{ secrets.SSH_PASS }}
+      TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
 
     steps:
+      - name: Install and Connect to Tailscale
+        run: |
+          echo "Installing and connecting to Tailscale..."
+          sudo apt-get update -y
+          sudo apt-get install -y tailscale
+          sudo systemctl enable --now tailscaled
+          sleep 3
+          
+          # Connect using auth key
+          sudo tailscale up --authkey=${TAILSCALE_AUTH_KEY} --accept-routes --accept-dns=false
+          
+          echo "Tailscale connected successfully."
+          sudo tailscale status
+
       - name: Login to Docker Hub
         run: |
           echo "Logging in to Docker Hub..."
@@ -58,35 +73,24 @@ jobs:
       - name: Start detached tmate session (prints SSH & web URLs)
         run: |
           set -e
-          # install tmate (Debian/Ubuntu)
           sudo apt-get update -y
           sudo apt-get install -y tmate
 
-          # define socket for this session
           export TMATE_SOCK=/tmp/tmate.sock
-
-          # start a detached session
           tmate -S $TMATE_SOCK new-session -d
 
-          # wait for tmate to be ready (max 30s)
           for i in $(seq 1 30); do
-            # show-keys & show-ssh works when tmate is ready
             SSH_URL=$(tmate -S $TMATE_SOCK display -p '#{tmate_ssh}')
-            if [ -n "$SSH_URL" ]; then
-              break
-            fi
+            if [ -n "$SSH_URL" ]; then break; fi
             sleep 1
           done
 
-          # if still empty, print diagnostics and fail
           if [ -z "$SSH_URL" ]; then
-            echo "tmate failed to start or provide SSH url. Dumping diagnostics:"
+            echo "tmate failed to start. Dumping diagnostics..."
             tmate -S $TMATE_SOCK show-messages || true
-            tmate -S $TMATE_SOCK display -p '#{tmate_web}' || true
             exit 1
           fi
 
-          # print the connection info (these lines will appear in Actions logs)
           echo "================= TMATE CONNECTION INFO ================="
           echo "SSH  : $SSH_URL"
           echo "WEB  : $(tmate -S $TMATE_SOCK display -p '#{tmate_web}')"
@@ -94,22 +98,27 @@ jobs:
           echo "You can connect now (use your ssh key or the printed URL)"
           echo "========================================================="
 
-          # keep the tmate process running (detached). Step exits immediately, leaving tmate running.
-        shell: bash
-        
       - name: Keep Workflow Alive & Auto-Restart
         run: |
           set -e
           start_time=$(date +%s)
-          max_runtime=$((5 * 60 * 60 + 30 * 60)) # 5h 50m in seconds
-      
-          trap 'echo "[Trap] SIGTERM caught. Saving session..."; docker commit kali-session ${{ secrets.DOCKERHUB_USERNAME }}/kali_linux:autov1; docker push ${{ secrets.DOCKERHUB_USERNAME }}/kali_linux:autov1; curl -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/${{ github.repository }}/actions/workflows/main.yml/dispatches -d "{\"ref\":\"main\"}"; exit 0' TERM
-      
+          max_runtime=$((5 * 60 * 60 + 30 * 60)) # 5h 30m
+
+          trap 'echo "[Trap] SIGTERM caught. Saving session..."; \
+                docker commit kali-session ${{ secrets.DOCKERHUB_USERNAME }}/kali_linux:autov1; \
+                docker push ${{ secrets.DOCKERHUB_USERNAME }}/kali_linux:autov1; \
+                curl -X POST \
+                  -H "Accept: application/vnd.github+json" \
+                  -H "Authorization: Bearer $GH_TOKEN" \
+                  https://api.github.com/repos/${{ github.repository }}/actions/workflows/main.yml/dispatches \
+                  -d "{\"ref\":\"main\"}"; \
+                exit 0' TERM
+
           while true; do
             now=$(date +%s)
             uptime=$((now - start_time))
             echo "[$(date)] Uptime: $((uptime / 60)) minutes"
-      
+
             if [ "$uptime" -ge "$max_runtime" ]; then
               echo "[$(date)] Restarting workflow (auto-trigger)..."
               docker commit kali-session ${{ secrets.DOCKERHUB_USERNAME }}/kali_linux:autov1
