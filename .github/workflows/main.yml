@@ -21,17 +21,6 @@ jobs:
           echo "Logging in to Docker Hub..."
           echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
       
-      - name: Install and Connect to Tailscale
-        run: |
-          echo "Installing and connecting to Tailscale..."
-          sudo apt-get update -y
-          sudo apt-get install -y tailscale
-          sudo tailscaled --state=mem: --socket=/tmp/tailscaled.sock &
-          sleep 3
-          sudo tailscale --socket=/tmp/tailscaled.sock up --authkey=${TAILSCALE_AUTH_KEY} --accept-routes --accept-dns=false
-          echo "Tailscale connected successfully."
-          sudo tailscale --socket=/tmp/tailscaled.sock status || true
-      
       - name: Pull and Run Container
         run: |
           IMAGE_NAME="$DOCKERHUB_USERNAME/kali_linux:autov1"
