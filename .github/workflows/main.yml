@@ -12,6 +12,8 @@ jobs:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
       SSH_PASS: ${{ secrets.SSH_PASS }}
+      TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Login to Docker Hub
@@ -36,6 +38,7 @@ jobs:
           echo "Starting container with full privileges..."
           docker run -d --name=kali-session \
             --privileged \
+            --network=host \
             --volume ~/shared_storage:/root/shared \
             "$IMAGE_NAME" tail -f /dev/null
       - name: Create Helper and Startup Scripts
