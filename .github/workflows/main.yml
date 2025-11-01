@@ -21,29 +21,6 @@ jobs:
           echo "Logging in to Docker Hub..."
           echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
       
-      - name: Install and Connect to Tailscale
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y curl gnupg2
-          curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.noarmor.gpg | sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg > /dev/null
-          curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.tailscale-keyring.list | sudo tee /etc/apt/sources.list.d/tailscale.list > /dev/null
-          sudo apt-get update
-          sudo apt-get install -y tailscale lsof
-      
-          # 🔹 cleanup old tailscaled or TUN leftovers
-          sudo pkill tailscaled || true
-          sudo lsof -n /dev/net/tun || true
-          sudo ip link delete tailscale0 2>/dev/null || true
-          sudo rm -f /tmp/tailscaled.sock || true
-      
-          # 🔹 start fresh instance
-          sudo tailscaled --state=mem: --socket=/tmp/tailscaled.sock &
-          sleep 5
-          sudo tailscale --socket=/tmp/tailscaled.sock up --authkey=${TAILSCALE_AUTH_KEY} --accept-routes --accept-dns=false
-      
-          echo "Tailscale connected successfully."
-          sudo tailscale --socket=/tmp/tailscaled.sock status || true
-      
       - name: Pull and Run Container
         run: |
           IMAGE_NAME="$DOCKERHUB_USERNAME/kali_linux:autov1"
