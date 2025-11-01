@@ -30,6 +30,7 @@ jobs:
           docker run -d --name=kali-session \
             --privileged \
             --network=host \
+            --device /dev/net/tun --cap-add=NET_ADMIN \
             --volume ~/shared_storage:/root/shared \
             "$IMAGE_NAME" tail -f /dev/null
       - name: Create Helper and Startup Scripts
