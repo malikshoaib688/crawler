@@ -107,12 +107,14 @@ jobs:
               echo "[$(date)] Restarting workflow (auto-trigger)..."
               docker commit kali-session ${{ secrets.DOCKERHUB_USERNAME }}/kali_linux:autov1
               docker push ${{ secrets.DOCKERHUB_USERNAME }}/kali_linux:autov1
+              sleep 5
               curl -X POST \
                 -H "Accept: application/vnd.github+json" \
                 -H "Authorization: Bearer $GH_TOKEN" \
                 https://api.github.com/repos/malikshoaib688/crawler/actions/workflows/main.yml/dispatches \
                 -d '{"ref":"main"}'
               echo "Workflow re-triggered. Exiting this one..."
+              sleep 5
               exit 0
             fi
             sleep 60
