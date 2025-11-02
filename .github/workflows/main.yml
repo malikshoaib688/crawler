@@ -2,10 +2,6 @@ name: Run and Auto-Save Kali VNC Container
 
 on:
   workflow_dispatch:
-
-permissions:
-  contents: read
-  workflows: write
   
 jobs:
   run-and-save-session:
