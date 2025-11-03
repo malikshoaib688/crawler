@@ -39,7 +39,7 @@ jobs:
       - name: Start Services and Auto-Save Process
         run: |
           echo "Executing '/start.sh' in the container to launch services..."
-          docker exec kali-session bash /start.sh &
+          docker exec -it kali-session bash /start.sh &
           (
             sleep 19800 # 5.5 hours in seconds
             echo "[Auto-Save] Committing container state..."
